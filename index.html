@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: white;
+        }
+    </style>
+</head>
+</head>
+<body>
+    <video autoplay playsinline webkit-playsinline muted hidden id="video"></video>
+
+  <canvas id="cam-canvas" hidden width="160" height="90"></canvas>
+  background color
+  <select id="bg-type">
+      <option selected value="white">white</option>
+      <option value="black">black</option>
+    </select>
+    text color
+    <select id="text-type">
+      <option selected value="monotone">monotone</option>
+      <option value="color">color</option>
+    </select>
+  <canvas id="text-canvas">my addiction is peaking and i am struggling quietly</canvas>
+
+  <script>
+  document.addEventListener("DOMContentLoaded", () => {
+    // character list from http://paulbourke.net/dataformats/asciiart/
+    let asciiData = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ".split("");
+    //let asciiData= ["@"];
+    const CHARACTER_SPACING = 9;
+    const FONT_SIZE = 14;
+    let background_color = "white";
+    let camCanvas = document.getElementById("cam-canvas");
+    let textCanvas = document.getElementById("text-canvas");
+    let bgType = document.getElementById("bg-type");
+    let textType = document.getElementById("text-type");
+    textCanvas.width  = window.innerWidth;
+    textCanvas.height = window.innerHeight;
+    let video = document.getElementById("video");
+    let mediaDevices = navigator.mediaDevices;
+            // Accessing the user camera and video.
+            mediaDevices
+                .getUserMedia({
+                    video: true,
+                    audio: false,
+                })
+                .then((stream) => {
+ 
+                    // Changing the source of video to current stream.
+                    video.srcObject = stream;
+                    video.addEventListener("loadedmetadata", () => {
+                        video.play();
+                    });
+                })
+                .catch(alert);
+    let videoCtx = camCanvas.getContext('2d', {alpha: false, willReadFrequently: true});
+    videoCtx.translate(camCanvas.width, 0);
+    videoCtx.scale(-1, 1);
+    let textCtx = textCanvas.getContext('2d', {alpha: false });
+    textCtx.font = `${FONT_SIZE}px Courier New`;
+    window.setInterval(() => {
+        videoCtx.drawImage(video, 0, 0, camCanvas.width, camCanvas.height);
+        textCtx.beginPath();
+        textCtx.fillStyle = background_color;
+        textCtx.rect(0,0,textCanvas.width, textCanvas.height);
+        textCtx.fill();
+        imageToAscii(videoCtx.getImageData(0, 0, camCanvas.width, camCanvas.height).data);
+    }, 1000 / 30);
+    
+    
+    function imageToAscii(data) {
+        for(let i = 0; i < data.length; i+=4) {
+            setTextColor(data[i], data[i+1], data[i+2]);
+            textCtx.fillText(asciiData[((data[i] + data[i+1] + data[i+2]) * asciiData.length / 765) | 0], CHARACTER_SPACING*0.75 * ((i/4%camCanvas.width) | 0), CHARACTER_SPACING * ((i/4/camCanvas.width) | 0) );
+        }
+    }
+    
+    function setTextColor(r,g,b) {
+        textCtx.fillStyle = "black";
+    }
+    
+    
+    bgType.addEventListener("change", (e) => {
+        background_color = bgType.value;
+        setText();
+    });
+    
+    textType.addEventListener("change", (e) => {setText();});
+    
+    function setText() {
+        if(textType.value === "monotone") {
+            if(background_color === "black") {
+                asciiData = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ".split("").reverse();
+                setTextColor = function(r,g,b) {
+                textCtx.fillStyle = "white";
+                };
+            } else {
+                asciiData = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ".split("");
+                setTextColor = function(r,g,b) {
+                textCtx.fillStyle = "black";
+                };
+            }
+        } else {
+            setTextColor = function(r,g,b) {
+            textCtx.fillStyle = `rgb(${r},${g},${b})`;
+        };
+        }
+    }
+    
+      
+  });
+  
+  </script>
+</body>
+</html>
