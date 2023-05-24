@@ -5,6 +5,7 @@
         body {
             font-family: monospace;
             background-color: white;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -23,39 +24,51 @@
       <option selected value="monotone">monotone</option>
       <option value="color">color</option>
     </select>
+    amount of detail
+    <input type="range" min="1" max="100" value="50" class="slider" id="detail-slider">
+    <button id="copy-button">copy frame</button>
   <canvas id="text-canvas"></canvas>
 
   <script>
   document.addEventListener("DOMContentLoaded", () => {
     // character list from http://paulbourke.net/dataformats/asciiart/
-    let asciiData = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ".split("");
+    const asciiString = "@%#*+=-:. ";
+    //const asciiString = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ";
+    
+    let asciiData = asciiString.split("");
     //let asciiData= ["@"];
-    const CHARACTER_SPACING = 9;
-    const FONT_SIZE = 14;
+    let FONT_SIZE = 14;
+    let CHARACTER_SPACING = setCharacterSpacing();
     let background_color = "white";
     let camCanvas = document.getElementById("cam-canvas");
     let textCanvas = document.getElementById("text-canvas");
     let bgType = document.getElementById("bg-type");
     let textType = document.getElementById("text-type");
+    let detailSlider = document.getElementById("detail-slider");
     textCanvas.width  = window.innerWidth;
     textCanvas.height = window.innerHeight;
+    let ratio;
     let video = document.getElementById("video");
     let mediaDevices = navigator.mediaDevices;
-            // Accessing the user camera and video.
-            mediaDevices
-                .getUserMedia({
-                    video: true,
-                    audio: false,
-                })
-                .then((stream) => {
- 
-                    // Changing the source of video to current stream.
-                    video.srcObject = stream;
-                    video.addEventListener("loadedmetadata", () => {
-                        video.play();
-                    });
-                })
-                .catch(alert);
+    let lastSavedFrame = "";
+    // Accessing the user camera and video.
+    mediaDevices
+        .getUserMedia({
+            video: true,
+            audio: false,
+        })
+        .then((stream) => {
+            let {width, height} = stream.getTracks()[0].getSettings();
+            detailSlider.max = width;
+            ratio = height / width;
+            updateCamSize();
+            // Changing the source of video to current stream.
+            video.srcObject = stream;
+            video.addEventListener("loadedmetadata", () => {
+                video.play();
+            });
+        })
+        .catch(alert);
     let videoCtx = camCanvas.getContext('2d', {alpha: false, willReadFrequently: true});
     videoCtx.translate(camCanvas.width, 0);
     videoCtx.scale(-1, 1);
@@ -69,23 +82,52 @@
         textCtx.fill();
         imageToAscii(videoCtx.getImageData(0, 0, camCanvas.width, camCanvas.height).data);
     }, 1000 / 30);
+    updateCamSize();
+    detailSlider.oninput = () => {
+        updateCamSize();
+    }
     
+    function updateCamSize() {
+        camCanvas.width = detailSlider.value;
+        camCanvas.height = detailSlider.value * ratio;
+        videoCtx.translate(camCanvas.width, 0);
+        videoCtx.scale(-1, 1);
+        FONT_SIZE = ( detailSlider.max / camCanvas.width ) * (textCanvas.width / detailSlider.max);
+        textCtx.font = `${FONT_SIZE}px Courier New`;
+        CHARACTER_SPACING = setCharacterSpacing();
+    }
     
     function imageToAscii(data) {
+        let temp = "";
         for(let i = 0; i < data.length; i+=4) {
+            let char = asciiData[((data[i] + data[i+1] + data[i+2]) * asciiData.length / 765) | 0];
+            if(i/4%camCanvas.width === 0) temp += "\n";
+            temp += char;
             setTextColor(data[i], data[i+1], data[i+2]);
-            textCtx.fillText(asciiData[((data[i] + data[i+1] + data[i+2]) * asciiData.length / 765) | 0], CHARACTER_SPACING*0.75 * ((i/4%camCanvas.width) | 0), CHARACTER_SPACING * ((i/4/camCanvas.width) | 0) );
+            textCtx.fillText(char, CHARACTER_SPACING /* *0.75 */ * ((i/4%camCanvas.width) | 0), CHARACTER_SPACING * ((i/4/camCanvas.width) | 0) );
         }
+        lastSavedFrame = temp;
     }
     
     function setTextColor(r,g,b) {
         textCtx.fillStyle = "black";
     }
     
+    function setCharacterSpacing() {
+        return FONT_SIZE * 0.642857143;
+    }
+    
+    document.getElementById("copy-button").onclick = function(){navigator.clipboard.writeText(lastSavedFrame);};
     
     bgType.addEventListener("change", (e) => {
         background_color = bgType.value;
+        document.body.style.backgroundColor = bgType.value;
         setText();
+        if(background_color === "black") {
+            document.body.style.color = "white";
+        } else {
+            document.body.style.color = "black";
+        }
     });
     
     textType.addEventListener("change", (e) => {setText();});
@@ -93,12 +135,12 @@
     function setText() {
         if(textType.value === "monotone") {
             if(background_color === "black") {
-                asciiData = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ".split("").reverse();
+                asciiData = asciiString.split("").reverse();
                 setTextColor = function(r,g,b) {
                 textCtx.fillStyle = "white";
                 };
             } else {
-                asciiData = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ".split("");
+                asciiData = asciiString.split("");
                 setTextColor = function(r,g,b) {
                 textCtx.fillStyle = "black";
                 };
